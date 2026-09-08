@@ -1,0 +1,48 @@
+package com.secureauth.service;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class EmailService {
+
+    private final JavaMailSender mailSender;
+
+    @Value("${app.mail.from}")
+    private String fromAddress;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
+    public void sendVerificationEmail(String toEmail, String fullName, String token) {
+        String link = frontendUrl + "/verify-email?token=" + token;
+        String body = "Hi " + fullName + ",\n\n"
+                + "Thanks for registering with SecureAuth. Please verify your email by clicking the link below:\n"
+                + link + "\n\n"
+                + "This link expires in 24 hours.\n\n"
+                + "If you did not create this account, please ignore this email.";
+        send(toEmail, "Verify your email - SecureAuth", body);
+    }
+
+    public void sendPasswordResetEmail(String toEmail, String fullName, String token) {
+        String link = frontendUrl + "/reset-password?token=" + token;
+        String body = "Hi " + fullName + ",\n\n"
+                + "We received a request to reset your password. Click the link below to set a new password:\n"
+                + link + "\n\n"
+                + "This link expires in 1 hour. If you did not request this, you can safely ignore this email.";
+        send(toEmail, "Reset your password - SecureAuth", body);
+    }
+
+    private void send(String to, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(fromAddress);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
+        mailSender.send(message);
+    }
+}
