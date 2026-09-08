@@ -16,11 +16,11 @@ A secure, RESTful authentication API built with Spring Boot. The service provide
 - Return centralized, structured API error responses
 - Explore and test APIs using Swagger UI
 
-- ## 🔗 Backend
+- ## 🔗 Frontend
 
-This project uses a Spring Boot backend.
+This project has a React frontend.
 
-👉 [View Backend Repository](https://github.com/sanojkushwaha/SecureAuth-backend)
+👉 [View Frontend Repository](https://github.com/sanojkushwaha/SecureAuth-Frontend)
 
 
 ## Tech stack
