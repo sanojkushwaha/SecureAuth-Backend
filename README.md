@@ -22,6 +22,7 @@ This project uses a Spring Boot backend.
 
 👉 [View Backend Repository](https://github.com/sanojkushwaha/SecureAuth-backend)
 
+
 ## Tech stack
 
 | Area | Technology |
