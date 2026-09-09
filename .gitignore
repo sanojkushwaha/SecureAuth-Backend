@@ -9,3 +9,7 @@
 # Editor-based HTTP Client requests
 /httpRequests/
 
+target
+.idea/
+*.iml
+
