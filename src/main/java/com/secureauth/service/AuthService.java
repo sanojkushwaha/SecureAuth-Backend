@@ -39,45 +39,29 @@ public class AuthService {
     // REGISTER
     // =========================
 
-    @Transactional
-    public MessageResponse register(RegisterRequest request) {
+@Transactional
+public MessageResponse register(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException(
-                    "An account with this email already exists"
-            );
-        }
-
-        // Generate verification token
-        String verificationToken = UUID.randomUUID().toString();
-
-     User user = User.builder()
-        .fullName(request.getFullName())
-        .email(request.getEmail().toLowerCase().trim())
-        .password(passwordEncoder.encode(request.getPassword()))
-        .role(Role.USER)
-        .emailVerified(true)
-        .build();
-
-userRepository.save(user);
-
-return new MessageResponse(
-        "Registration successful. You can now log in."
-);
-
-        userRepository.save(user);
-
-      //  Send verification email
-        // emailService.sendVerificationEmail(
-        //         user.getEmail(),
-        //         user.getFullName(),
-        //         verificationToken
-        // );
-
-        return new MessageResponse(
-                "Registration successful. Please check your email to verify your account."
+    if (userRepository.existsByEmail(request.getEmail())) {
+        throw new BadRequestException(
+                "An account with this email already exists"
         );
     }
+
+    User user = User.builder()
+            .fullName(request.getFullName())
+            .email(request.getEmail().toLowerCase().trim())
+            .password(passwordEncoder.encode(request.getPassword()))
+            .role(Role.USER)
+            .emailVerified(true)
+            .build();
+
+    userRepository.save(user);
+
+    return new MessageResponse(
+            "Registration successful. You can now log in."
+    );
+}
 
     // =========================
     // VERIFY EMAIL
