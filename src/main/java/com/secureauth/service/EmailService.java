@@ -12,8 +12,6 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.mail.from}")
-    private String fromAddress;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
