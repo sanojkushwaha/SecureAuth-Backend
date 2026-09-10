@@ -82,7 +82,13 @@ public class AuthService {
         user.setVerificationToken(null);
         user.setVerificationTokenExpiry(null);
 
-        userRepository.save(user);
+       userRepository.save(user);
+
+emailService.sendVerificationEmail(
+        user.getEmail(),
+        user.getFullName(),
+        verificationToken
+);
 
         return new MessageResponse(
                 "Email verified successfully. You can now log in.");
