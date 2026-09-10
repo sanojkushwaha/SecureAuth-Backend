@@ -102,7 +102,7 @@ public class AuthService {
         }
 
         // Verify account
-        user.setEmailVerified(false);
+        user.setEmailVerified(true);
 
         // Remove verification token after successful verification
         user.setVerificationToken(null);
