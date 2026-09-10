@@ -35,12 +35,20 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
 
+    // =========================
+    // REGISTER
+    // =========================
+
     @Transactional
     public MessageResponse register(RegisterRequest request) {
+
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("An account with this email already exists");
+            throw new BadRequestException(
+                    "An account with this email already exists"
+            );
         }
 
+        // Generate verification token
         String verificationToken = UUID.randomUUID().toString();
 
         User user = User.builder()
@@ -50,79 +58,122 @@ public class AuthService {
                 .role(Role.USER)
                 .emailVerified(false)
                 .verificationToken(verificationToken)
-                .verificationTokenExpiry(LocalDateTime.now().plusHours(24))
+                .verificationTokenExpiry(
+                        LocalDateTime.now().plusHours(24)
+                )
                 .build();
 
         userRepository.save(user);
 
-// emailService.sendVerificationEmail(
-//         user.getEmail(),
-//         user.getFullName(),
-//         verificationToken
-// );
+        // Send verification email
+        emailService.sendVerificationEmail(
+                user.getEmail(),
+                user.getFullName(),
+                verificationToken
+        );
 
-        return new MessageResponse("Registration successful. Please check your email to verify your account.");
+        return new MessageResponse(
+                "Registration successful. Please check your email to verify your account."
+        );
     }
+
+    // =========================
+    // VERIFY EMAIL
+    // =========================
 
     @Transactional
     public MessageResponse verifyEmail(String token) {
 
         User user = userRepository.findByVerificationToken(token)
                 .orElseThrow(() ->
-                        new BadRequestException("Invalid verification token"));
+                        new BadRequestException(
+                                "Invalid verification token"
+                        )
+                );
 
-        if (user.getVerificationTokenExpiry()
-                .isBefore(LocalDateTime.now())) {
+        // Check token expiry
+        if (user.getVerificationTokenExpiry() == null ||
+                user.getVerificationTokenExpiry()
+                        .isBefore(LocalDateTime.now())) {
 
             throw new TokenExpiredException(
-                    "Verification link has expired. Please request a new one.");
+                    "Verification link has expired. Please request a new one."
+            );
         }
 
+        // Verify account
         user.setEmailVerified(true);
+
+        // Remove verification token after successful verification
         user.setVerificationToken(null);
         user.setVerificationTokenExpiry(null);
 
-       userRepository.save(user);
-
-emailService.sendVerificationEmail(
-        user.getEmail(),
-        user.getFullName(),
-        verificationToken
-);
+        userRepository.save(user);
 
         return new MessageResponse(
-                "Email verified successfully. You can now log in.");
+                "Email verified successfully. You can now log in."
+        );
     }
+
+    // =========================
+    // LOGIN
+    // =========================
 
     @Transactional
     public JwtResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        User user = userRepository.findByEmail(
+                        request.getEmail().toLowerCase().trim()
+                )
+                .orElseThrow(() ->
+                        new BadCredentialsException(
+                                "Invalid email or password"
+                        )
+                );
 
         checkAndUnlockAccountIfEligible(user);
 
         if (user.isAccountLocked()) {
             throw new AccountLockedException(
                     "Account is locked due to multiple failed login attempts. Try again after "
-                    + LOCK_DURATION_MINUTES + " minutes.");
+                            + LOCK_DURATION_MINUTES + " minutes."
+            );
         }
 
         try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail().toLowerCase().trim(), request.getPassword())
-            );
 
-            // Successful login: reset failed attempts
+            Authentication authentication =
+                    authenticationManager.authenticate(
+                            new UsernamePasswordAuthenticationToken(
+                                    request.getEmail().toLowerCase().trim(),
+                                    request.getPassword()
+                            )
+                    );
+
+            // Successful login → reset failed attempts
             user.setFailedLoginAttempts(0);
             userRepository.save(user);
 
-            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            UserDetailsImpl userDetails =
+                    (UserDetailsImpl) authentication.getPrincipal();
 
-            String accessToken = jwtUtil.generateAccessToken(userDetails, user.getRole().name());
-            String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+            String accessToken =
+                    jwtUtil.generateAccessToken(
+                            userDetails,
+                            user.getRole().name()
+                    );
+
+            String refreshToken =
+                    jwtUtil.generateRefreshToken(userDetails);
 
             user.setRefreshToken(refreshToken);
-            user.setRefreshTokenExpiry(LocalDateTime.now().plusSeconds(jwtUtil.getRefreshTokenExpirationMs() / 1000));
+
+            user.setRefreshTokenExpiry(
+                    LocalDateTime.now().plusSeconds(
+                            jwtUtil.getRefreshTokenExpirationMs() / 1000
+                    )
+            );
+
             userRepository.save(user);
 
             return JwtResponse.builder()
@@ -135,52 +186,99 @@ emailService.sendVerificationEmail(
                     .build();
 
         } catch (org.springframework.security.authentication.DisabledException ex) {
-            throw ex; // handled globally -> "email not verified"
+
+            // Account is not verified
+            throw ex;
+
         } catch (BadCredentialsException ex) {
+
             registerFailedAttempt(user);
-            throw new BadCredentialsException("Invalid email or password");
+
+            throw new BadCredentialsException(
+                    "Invalid email or password"
+            );
         }
     }
 
+    // =========================
+    // FAILED LOGIN ATTEMPTS
+    // =========================
+
     private void registerFailedAttempt(User user) {
+
         int attempts = user.getFailedLoginAttempts() + 1;
+
         user.setFailedLoginAttempts(attempts);
 
         if (attempts >= MAX_FAILED_ATTEMPTS) {
+
             user.setAccountLocked(true);
             user.setLockTime(LocalDateTime.now());
         }
+
         userRepository.save(user);
     }
 
+    // =========================
+    // ACCOUNT UNLOCK
+    // =========================
+
     private void checkAndUnlockAccountIfEligible(User user) {
-        if (user.isAccountLocked() && user.getLockTime() != null) {
-            boolean lockExpired = user.getLockTime()
-                    .plusMinutes(LOCK_DURATION_MINUTES)
-                    .isBefore(LocalDateTime.now());
+
+        if (user.isAccountLocked() &&
+                user.getLockTime() != null) {
+
+            boolean lockExpired =
+                    user.getLockTime()
+                            .plusMinutes(LOCK_DURATION_MINUTES)
+                            .isBefore(LocalDateTime.now());
 
             if (lockExpired) {
+
                 user.setAccountLocked(false);
                 user.setFailedLoginAttempts(0);
                 user.setLockTime(null);
+
                 userRepository.save(user);
             }
         }
     }
 
+    // =========================
+    // REFRESH TOKEN
+    // =========================
+
     @Transactional
-    public JwtResponse refreshToken(RefreshTokenRequest request) {
+    public JwtResponse refreshToken(
+            RefreshTokenRequest request
+    ) {
+
         String token = request.getRefreshToken();
 
         User user = userRepository.findByRefreshToken(token)
-                .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+                .orElseThrow(() ->
+                        new BadRequestException(
+                                "Invalid refresh token"
+                        )
+                );
 
-        if (user.getRefreshTokenExpiry() == null || user.getRefreshTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new TokenExpiredException("Refresh token has expired. Please log in again.");
+        if (user.getRefreshTokenExpiry() == null ||
+                user.getRefreshTokenExpiry()
+                        .isBefore(LocalDateTime.now())) {
+
+            throw new TokenExpiredException(
+                    "Refresh token has expired. Please log in again."
+            );
         }
 
-        UserDetailsImpl userDetails = new UserDetailsImpl(user);
-        String newAccessToken = jwtUtil.generateAccessToken(userDetails, user.getRole().name());
+        UserDetailsImpl userDetails =
+                new UserDetailsImpl(user);
+
+        String newAccessToken =
+                jwtUtil.generateAccessToken(
+                        userDetails,
+                        user.getRole().name()
+                );
 
         return JwtResponse.builder()
                 .accessToken(newAccessToken)
@@ -192,53 +290,119 @@ emailService.sendVerificationEmail(
                 .build();
     }
 
+    // =========================
+    // LOGOUT
+    // =========================
+
     @Transactional
     public MessageResponse logout(Long userId) {
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "User not found"
+                        )
+                );
+
         user.setRefreshToken(null);
         user.setRefreshTokenExpiry(null);
+
         userRepository.save(user);
-        return new MessageResponse("Logged out successfully");
+
+        return new MessageResponse(
+                "Logged out successfully"
+        );
     }
 
+    // =========================
+    // FORGOT PASSWORD
+    // =========================
+
     @Transactional
-    public MessageResponse forgotPassword(ForgotPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
+    public MessageResponse forgotPassword(
+            ForgotPasswordRequest request
+    ) {
+
+        User user = userRepository.findByEmail(
+                        request.getEmail().toLowerCase().trim()
+                )
                 .orElse(null);
 
-        // Always return a generic success message so we don't leak which emails are registered
+        // Generic response to prevent email enumeration
         if (user == null) {
-            return new MessageResponse("If an account exists with this email, a reset link has been sent.");
+
+            return new MessageResponse(
+                    "If an account exists with this email, a reset link has been sent."
+            );
         }
 
-        String resetToken = UUID.randomUUID().toString();
+        String resetToken =
+                UUID.randomUUID().toString();
+
         user.setResetPasswordToken(resetToken);
-        user.setResetPasswordTokenExpiry(LocalDateTime.now().plusHours(1));
+
+        user.setResetPasswordTokenExpiry(
+                LocalDateTime.now().plusHours(1)
+        );
+
         userRepository.save(user);
 
-        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetToken);
+        emailService.sendPasswordResetEmail(
+                user.getEmail(),
+                user.getFullName(),
+                resetToken
+        );
 
-        return new MessageResponse("If an account exists with this email, a reset link has been sent.");
+        return new MessageResponse(
+                "If an account exists with this email, a reset link has been sent."
+        );
     }
 
-    @Transactional
-    public MessageResponse resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByResetPasswordToken(request.getToken())
-                .orElseThrow(() -> new BadRequestException("Invalid or expired reset token"));
+    // =========================
+    // RESET PASSWORD
+    // =========================
 
-        if (user.getResetPasswordTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new TokenExpiredException("Reset link has expired. Please request a new one.");
+    @Transactional
+    public MessageResponse resetPassword(
+            ResetPasswordRequest request
+    ) {
+
+        User user =
+                userRepository.findByResetPasswordToken(
+                                request.getToken()
+                        )
+                        .orElseThrow(() ->
+                                new BadRequestException(
+                                        "Invalid or expired reset token"
+                                )
+                        );
+
+        if (user.getResetPasswordTokenExpiry() == null ||
+                user.getResetPasswordTokenExpiry()
+                        .isBefore(LocalDateTime.now())) {
+
+            throw new TokenExpiredException(
+                    "Reset link has expired. Please request a new one."
+            );
         }
 
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPassword(
+                passwordEncoder.encode(
+                        request.getNewPassword()
+                )
+        );
+
         user.setResetPasswordToken(null);
         user.setResetPasswordTokenExpiry(null);
+
         // Invalidate existing sessions
         user.setRefreshToken(null);
         user.setRefreshTokenExpiry(null);
+
         userRepository.save(user);
 
-        return new MessageResponse("Password reset successful. Please log in with your new password.");
+        return new MessageResponse(
+                "Password reset successful. Please log in with your new password."
+        );
     }
 }
