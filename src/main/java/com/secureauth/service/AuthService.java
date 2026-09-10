@@ -51,26 +51,28 @@ public class AuthService {
         // Generate verification token
         String verificationToken = UUID.randomUUID().toString();
 
-        User user = User.builder()
-                .fullName(request.getFullName())
-                .email(request.getEmail().toLowerCase().trim())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
-                .emailVerified(false)
-                .verificationToken(verificationToken)
-                .verificationTokenExpiry(
-                        LocalDateTime.now().plusHours(24)
-                )
-                .build();
+     User user = User.builder()
+        .fullName(request.getFullName())
+        .email(request.getEmail().toLowerCase().trim())
+        .password(passwordEncoder.encode(request.getPassword()))
+        .role(Role.USER)
+        .emailVerified(true)
+        .build();
+
+userRepository.save(user);
+
+return new MessageResponse(
+        "Registration successful. You can now log in."
+);
 
         userRepository.save(user);
 
       //  Send verification email
-        emailService.sendVerificationEmail(
-                user.getEmail(),
-                user.getFullName(),
-                verificationToken
-        );
+        // emailService.sendVerificationEmail(
+        //         user.getEmail(),
+        //         user.getFullName(),
+        //         verificationToken
+        // );
 
         return new MessageResponse(
                 "Registration successful. Please check your email to verify your account."
