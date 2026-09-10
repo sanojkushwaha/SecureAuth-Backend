@@ -65,7 +65,7 @@ public class AuthService {
 
         userRepository.save(user);
 
-        Send verification email
+      //  Send verification email
         emailService.sendVerificationEmail(
                 user.getEmail(),
                 user.getFullName(),
