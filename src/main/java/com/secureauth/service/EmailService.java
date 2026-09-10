@@ -74,7 +74,6 @@ public class EmailService {
 
         SimpleMailMessage message = new SimpleMailMessage();
 
-        message.setFrom(fromAddress);
         message.setTo(to);
         message.setSubject(subject);
         message.setText(body);
