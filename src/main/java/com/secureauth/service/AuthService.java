@@ -65,12 +65,12 @@ public class AuthService {
 
         userRepository.save(user);
 
-        // Send verification email
-        // emailService.sendVerificationEmail(
-        //         user.getEmail(),
-        //         user.getFullName(),
-        //         verificationToken
-        // );
+        Send verification email
+        emailService.sendVerificationEmail(
+                user.getEmail(),
+                user.getFullName(),
+                verificationToken
+        );
 
         return new MessageResponse(
                 "Registration successful. Please check your email to verify your account."
